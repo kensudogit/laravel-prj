@@ -1,101 +1,111 @@
+# Laravel + Next.js + Flutter 開発環境のDocker Compose設定
+# フルスタック開発環境を構築するためのマルチコンテナ設定
 version: '3.8'
 
 services:
+  # ===== Laravelバックエンドサービス =====
   app:
     build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-    container_name: laravel_app
-    restart: unless-stopped
-    working_dir: /var/www/
+      context: . # ビルドコンテキスト（現在のディレクトリ）
+      dockerfile: docker/php/Dockerfile # PHP Dockerfileのパス
+    container_name: laravel_app # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
+    working_dir: /var/www/ # 作業ディレクトリ
     volumes:
-      - ./src:/var/www
-      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./src:/var/www # Laravelソースコードのマウント
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini # PHP設定ファイルのマウント
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
 
+  # ===== Apache Webサーバーサービス =====
   webserver:
-    image: httpd:2.4
-    container_name: laravel_webserver
-    restart: unless-stopped
+    image: httpd:2.4 # Apache 2.4イメージ
+    container_name: laravel_webserver # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
     ports:
-      - "8000:80"
-      - "443:443"
+      - "8000:80" # HTTPポート（ホスト:コンテナ）
+      - "443:443" # HTTPSポート（ホスト:コンテナ）
     volumes:
-      - ./src:/var/www
-      - ./docker/apache/000-default.conf:/etc/apache2/sites-available/000-default.conf
-      - ./docker/apache/ssl:/etc/apache2/ssl
+      - ./src:/var/www # Laravelソースコードのマウント
+      - ./docker/apache/000-default.conf:/etc/apache2/sites-available/000-default.conf # Apache設定ファイル
+      - ./docker/apache/ssl:/etc/apache2/ssl # SSL証明書ディレクトリ
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
     depends_on:
-      - app
+      - app # Laravelアプリケーションに依存
 
+  # ===== Next.jsフロントエンドサービス =====
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: laravel_frontend
-    restart: unless-stopped
+      context: ./frontend # フロントエンドディレクトリをビルドコンテキストに
+      dockerfile: Dockerfile # Next.js Dockerfile
+    container_name: laravel_frontend # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
     ports:
-      - "3000:3000"
+      - "3000:3000" # Next.jsポート（ホスト:コンテナ）
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - ./frontend:/app # フロントエンドソースコードのマウント
+      - /app/node_modules # node_modulesボリューム（ホットリロード対応）
+      - /app/.next # Next.jsビルドキャッシュボリューム
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://laravel_app:8000
+      - NODE_ENV=development # 開発環境設定
+      - NEXT_PUBLIC_API_URL=http://laravel_app:8000 # Laravel APIのURL
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
     depends_on:
-      - app
+      - app # Laravelアプリケーションに依存
 
+  # ===== MySQLデータベースサービス =====
   db:
-    image: mysql:8.0
-    container_name: laravel_db
-    restart: unless-stopped
+    image: mysql:8.0 # MySQL 8.0イメージ
+    container_name: laravel_db # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
     environment:
-      MYSQL_DATABASE: laravel_app
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_PASSWORD: laravel_password
-      MYSQL_USER: laravel_user
-      SERVICE_TAGS: dev
-      SERVICE_NAME: mysql
+      MYSQL_DATABASE: laravel_app # データベース名
+      MYSQL_ROOT_PASSWORD: root_password # rootパスワード
+      MYSQL_PASSWORD: laravel_password # ユーザーパスワード
+      MYSQL_USER: laravel_user # ユーザー名
+      SERVICE_TAGS: dev # サービスタグ
+      SERVICE_NAME: mysql # サービス名
     ports:
-      - "3306:3306"
+      - "3306:3306" # MySQLポート（ホスト:コンテナ）
     volumes:
-      - dbdata:/var/lib/mysql
-      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+      - dbdata:/var/lib/mysql # データベースデータの永続化
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf # MySQL設定ファイル
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
 
+  # ===== phpMyAdmin管理ツールサービス =====
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: laravel_phpmyadmin
-    restart: unless-stopped
+    image: phpmyadmin/phpmyadmin # phpMyAdminイメージ
+    container_name: laravel_phpmyadmin # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
     ports:
-      - "8080:80"
+      - "8080:80" # phpMyAdminポート（ホスト:コンテナ）
     environment:
-      PMA_HOST: db
-      MYSQL_ROOT_PASSWORD: root_password
+      PMA_HOST: db # MySQLホスト名
+      MYSQL_ROOT_PASSWORD: root_password # rootパスワード
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
     depends_on:
-      - db
+      - db # データベースに依存
 
+  # ===== Redisキャッシュサービス =====
   redis:
-    image: redis:7-alpine
-    container_name: laravel_redis
-    restart: unless-stopped
+    image: redis:7-alpine # Redis 7 Alpineイメージ
+    container_name: laravel_redis # コンテナ名
+    restart: unless-stopped # 停止時以外は自動再起動
     ports:
-      - "6379:6379"
+      - "6379:6379" # Redisポート（ホスト:コンテナ）
     networks:
-      - laravel_network
+      - laravel_network # ネットワーク接続
 
+# ===== ボリューム定義 =====
 volumes:
-  dbdata:
-    driver: local
+  dbdata: # データベースデータ用ボリューム
+    driver: local # ローカルドライバー
 
+# ===== ネットワーク定義 =====
 networks:
-  laravel_network:
-    driver: bridge 
+  laravel_network: # カスタムネットワーク
+    driver: bridge # ブリッジドライバー 
